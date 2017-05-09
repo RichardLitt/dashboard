@@ -1,0 +1,23 @@
+.App {
+}
+
+.App-header {
+  background-color: #222;
+  color: white;
+  padding: 1em;
+}
+
+.App-content {
+  padding: 1em;
+}
+
+.App-repos {
+}
+
+.App-repos-repo {
+  cursor: pointer;
+}
+
+.App-help {
+  margin-bottom: 1.5em;
+}

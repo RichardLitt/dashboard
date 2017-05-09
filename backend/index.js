@@ -6,20 +6,24 @@ const cors = require('cors')
 const app = express()
 const Octokat = require('octokat')
 
-const config = {
-  mongodbUrl: 'mongodb://localhost:27017',
-  frontendDirectory: path.join(__dirname, '../', 'public'),
-  port: 4000,
+const EnabledRepos = require('./enabled-repos')
+const config = require('./config')
+
+let database
+
+const getUserId = (req) => {
+  // return a hard coded user id until we have users implemented
+  return 'ABCDEFG'
 }
 
-// Temp state, put to mongodb
-let tmp = {
-  items: [
-    { id: 56703853 },
-  ]
+const handleError = (res, err) => {
+  if (res)
+    res.status(500).send({ error: err.toString() })
+  console.error(err)
 }
 
-let db
+// Return hardcoded username for now
+const getUsername = (req) => 'haadcode'
 
 // Enable CORS
 app.use(cors())
@@ -28,76 +32,55 @@ app.use(cors())
 app.use(express.static(config.frontendDirectory))
 
 // REST API
-app.get('/user', (req, res) => {
-  res.send("user account information")
-})
-
-app.get('/user/status', (req, res) => {
-  res.send("status page / main page?")
-})
-
-app.get('/user/repos', (req, res) => {
+app.get('/repos', (req, res) => {
   const octo = new Octokat()
-  octo.users('haadcode').repos
+  octo.users(getUsername(req)).repos
     .fetch()
-    .then((repos) => {
-      res.json(repos)
-    })
-    .catch((err) => console.error(err))
+    .then((repos) => res.json(repos.items))
+    .catch(e => handleError(res, e))
 })
 
-app.get('/user/repos/enabled', (req, res) => {
-  const userId = 'ABCDEFG'
-  const collection = db.collection('test')
-  collection.findOne({ _id: userId })
-    .then((item) => res.json({ items: item ? item.enabledRepos : [] }))
-    .catch(e => res.status(500).send({ error: e.toString() }))
+app.get('/repos/enabled', (req, res) => {
+  // console.log("Get enable repos:", getUserId(req))
+
+  const userId = getUserId(req)
+  EnabledRepos.list(database, userId)
+    .then((repos) => res.json(repos))
+    .catch(e => handleError(res, e))
 })
 
-app.get('/user/repos/enable/:id', (req, res) => {
-  console.log("Enable repo:", req.params.id)
+app.get('/repos/enable/:id', (req, res) => {
+  // console.log("Enable repo:", req.params.id)
 
   if (!req.params.id || parseInt(req.params.id) === NaN)
     return res.error("Not a valid id: " + req.params.id)
 
-  const userId = 'ABCDEFG'
+  const userId = getUserId(req)
   const repoId = parseInt(req.params.id)
 
-  const collection = db.collection('test')
-  collection.updateOne(
-    { _id: userId },
-    { $addToSet: { enabledRepos: { id: repoId } } }, // Add the repo id to the array if its not in the array already
-    { upsert: true } // Add if it doesn't exist, update if it does
-  )
-    .then((result) => collection.findOne({ _id: userId }))
-    .then((item) => res.json({ items: item ? item.enabledRepos : [] }))
-    .catch(e => res.error(e))
+  EnabledRepos.enableRepo(database, userId, repoId)
+    .then(() => EnabledRepos.list(database, userId))
+    .then((repos) => res.json(repos))
+    .catch(e => handleError(res, e))
 })
 
-app.get('/user/repos/disable/:id', (req, res) => {
-  console.log("Disable repo:", req.params.id)
+app.get('/repos/disable/:id', (req, res) => {
+  // console.log("Disable repo:", req.params.id)
 
   if (!req.params.id || parseInt(req.params.id) === NaN)
     return res.error("Not a valid id: " + req.params.id)
 
-  const userId = 'ABCDEFG'
+  const userId = getUserId(req)
   const repoId = parseInt(req.params.id)
 
-  tmp.items.push({ id: repoId })
-  const collection = db.collection('test')
-  collection.updateOne(
-    { _id: userId },
-    { $pull: { enabledRepos: { id: repoId } } }, // Add the repo id to the array if its not in the array already
-    { upsert: true } // Add if it doesn't exist, update if it does
-  )
-    .then((result) => collection.findOne({ _id: userId }))
-    .then((item) => res.json({ items: item ? item.enabledRepos : [] }))
-    .catch(e => res.error(e))
+  EnabledRepos.disableRepo(database, userId, repoId)
+    .then(() => EnabledRepos.list(database, userId))
+    .then((repos) => res.json(repos))
+    .catch(handleError)
 })
 
-MongoClient.connect(config.mongodbUrl, (err, database) => {
-  db = database
-
+MongoClient.connect(config.mongodbUrl, (err, result) => {
+  database = result
   // Start the HTTP server
   app.listen(config.port, () => {
     console.log('Backend listening on port', config.port)
