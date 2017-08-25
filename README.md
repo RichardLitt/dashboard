@@ -2,6 +2,8 @@
 
 Another GitHub status dashboard.
 
+Similar in scope to [RichardLitt/maintainer-dashboard](https://github.com/RichardLitt/maintainer-dashboard). 
+
 ## Install
 
 Run `npm i` in both the backend and frontend folders.
